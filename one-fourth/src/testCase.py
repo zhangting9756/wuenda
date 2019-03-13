@@ -97,4 +97,4 @@ def update_parameters_test_case():
              "db1": db1,
              "dW2": dW2,
              "db2": db2}
-
+    return parameters, grads
