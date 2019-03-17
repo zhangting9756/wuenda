@@ -1,6 +1,11 @@
+# -*- coding: utf-8 -*-
+
+#opt_utils.py
+
 import numpy as np
 import matplotlib.pyplot as plt
-import scipy.io as sio
+import sklearn
+import sklearn.datasets
 
 def sigmoid(x):
     """
@@ -30,6 +35,20 @@ def relu(x):
     return s
 
 
+def load_params_and_grads(seed=1):
+    np.random.seed(seed)
+    W1 = np.random.randn(2,3)
+    b1 = np.random.randn(2,1)
+    W2 = np.random.randn(3,3)
+    b2 = np.random.randn(3,1)
+
+    dW1 = np.random.randn(2,3)
+    db1 = np.random.randn(2,1)
+    dW2 = np.random.randn(3,3)
+    db2 = np.random.randn(3,1)
+
+    return W1, b1, W2, b2, dW1, db1, dW2, db2
+
 def initialize_parameters(layer_dims):
     """
     Arguments:
@@ -53,12 +72,11 @@ def initialize_parameters(layer_dims):
     L = len(layer_dims) # number of layers in the network
 
     for l in range(1, L):
-        parameters['W' + str(l)] = np.random.randn(layer_dims[l], layer_dims[l-1]) / np.sqrt(layer_dims[l-1])
+        parameters['W' + str(l)] = np.random.randn(layer_dims[l], layer_dims[l-1])*  np.sqrt(2 / layer_dims[l-1])
         parameters['b' + str(l)] = np.zeros((layer_dims[l], 1))
 
         assert(parameters['W' + str(l)].shape == layer_dims[l], layer_dims[l-1])
         assert(parameters['W' + str(l)].shape == layer_dims[l], 1)
-
 
     return parameters
 
@@ -68,7 +86,6 @@ def forward_propagation(X, parameters):
 
     Arguments:
     X -- input dataset, of shape (input size, number of examples)
-    Y -- true "label" vector (containing 0 if cat, 1 if non-cat)
     parameters -- python dictionary containing your parameters "W1", "b1", "W2", "b2", "W3", "b3":
                     W1 -- weight matrix of shape ()
                     b1 -- bias vector of shape ()
@@ -100,26 +117,6 @@ def forward_propagation(X, parameters):
     cache = (z1, a1, W1, b1, z2, a2, W2, b2, z3, a3, W3, b3)
 
     return a3, cache
-
-
-
-def compute_cost(a3, Y):
-    """
-    Implement the cost function
-
-    Arguments:
-    a3 -- post-activation, output of forward propagation
-    Y -- "true" labels vector, same shape as a3
-
-    Returns:
-    cost - value of the cost function
-    """
-    m = Y.shape[1]
-
-    logprobs = np.multiply(-np.log(a3),Y) + np.multiply(-np.log(1 - a3), 1 - Y)
-    cost = 1./m * np.nansum(logprobs)
-
-    return cost
 
 def backward_propagation(X, Y, cache):
     """
@@ -156,43 +153,24 @@ def backward_propagation(X, Y, cache):
 
     return gradients
 
-def update_parameters(parameters, grads, learning_rate):
+def compute_cost(a3, Y):
+
     """
-    Update parameters using gradient descent
+    Implement the cost function
 
     Arguments:
-    parameters -- python dictionary containing your parameters 
-    grads -- python dictionary containing your gradients, output of n_model_backward
+    a3 -- post-activation, output of forward propagation
+    Y -- "true" labels vector, same shape as a3
 
     Returns:
-    parameters -- python dictionary containing your updated parameters 
-                  parameters['W' + str(i)] = ... 
-                  parameters['b' + str(i)] = ...
+    cost - value of the cost function
     """
+    m = Y.shape[1]
 
-    L = len(parameters) // 2 # number of layers in the neural networks
+    logprobs = np.multiply(-np.log(a3),Y) + np.multiply(-np.log(1 - a3), 1 - Y)
+    cost = 1./m * np.sum(logprobs)
 
-    # Update rule for each parameter
-    for k in range(L):
-        parameters["W" + str(k+1)] = parameters["W" + str(k+1)] - learning_rate * grads["dW" + str(k+1)]
-        parameters["b" + str(k+1)] = parameters["b" + str(k+1)] - learning_rate * grads["db" + str(k+1)]
-
-    return parameters
-
-
-
-
-def load_2D_dataset(is_plot=True):
-    data = sio.loadmat('F:\wuenda\second-one/data.mat')
-    train_X = data['X'].T
-    train_Y = data['y'].T
-    test_X = data['Xval'].T
-    test_Y = data['yval'].T
-    if is_plot:
-        plt.scatter(train_X[0, :], train_X[1, :], c=train_Y, s=40);
-        plt.show()
-
-    return train_X, train_Y, test_X, test_Y
+    return cost
 
 def predict(X, y, parameters):
     """
@@ -220,9 +198,29 @@ def predict(X, y, parameters):
             p[0,i] = 0
 
     # print results
+
+    #print ("predictions: " + str(p[0,:]))
+    #print ("true labels: " + str(y[0,:]))
     print("Accuracy: "  + str(np.mean((p[0,:] == y[0,:]))))
 
     return p
+
+def predict_dec(parameters, X):
+    """
+    Used for plotting decision boundary.
+
+    Arguments:
+    parameters -- python dictionary containing your parameters 
+    X -- input data of size (m, K)
+
+    Returns
+    predictions -- vector of predictions of our model (red: 0 / blue: 1)
+    """
+
+    # Predict using forward propagation and a classification threshold of 0.5
+    a3, cache = forward_propagation(X, parameters)
+    predictions = (a3 > 0.5)
+    return predictions
 
 def plot_decision_boundary(model, X, y):
     # Set min and max values and give it some padding
@@ -241,19 +239,13 @@ def plot_decision_boundary(model, X, y):
     plt.scatter(X[0, :], X[1, :], c=y)
     plt.show()
 
-def predict_dec(parameters, X):
-    """
-    Used for plotting decision boundary.
+def load_dataset(is_plot = True):
+    np.random.seed(3)
+    train_X, train_Y = sklearn.datasets.make_moons(n_samples=300, noise=.2) #300 #0.2 
+    # Visualize the data
+    if is_plot:
+        plt.scatter(train_X[:, 0], train_X[:, 1], c=train_Y, s=40);
+    train_X = train_X.T
+    train_Y = train_Y.reshape((1, train_Y.shape[0]))
 
-    Arguments:
-    parameters -- python dictionary containing your parameters 
-    X -- input data of size (m, K)
-
-    Returns
-    predictions -- vector of predictions of our model (red: 0 / blue: 1)
-    """
-
-    # Predict using forward propagation and a classification threshold of 0.5
-    a3, cache = forward_propagation(X, parameters)
-    predictions = (a3>0.5)
-    return predictions
+    return train_X, train_Y
